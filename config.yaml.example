@@ -1,0 +1,30 @@
+# 邮箱配置
+email:
+  imap_server: "imap.qq.com"
+  imap_port: 993
+  address: "your_email@qq.com"
+  password: "your_app_password"
+
+# 账单过滤规则
+filters:
+  wechat:
+    from: ["wechatpay@tencent.com"]
+    subject_keywords: ["微信支付", "账单流水"]
+  alipay:
+    from: ["service@mail.alipay.com", "service@alipay.com", "notice@alipay.com"]
+    subject_keywords: ["支付宝交易记录", "账单下载", "交易记录"]
+
+# 数据存储
+storage:
+  data_dir: "./data"
+  processed_uid_file: "./data/processed_uids.txt"
+
+# EasyAccounts 账户分类映射
+accounts:
+  wechat: 1  # 微信账户ID
+  alipay: 2  # 支付宝账户ID（用户新建的分类）
+
+# EasyAccounts API（后续配置）
+easyaccounts:
+  base_url: "http://localhost:10669"
+  api_key: ""
