@@ -289,40 +289,20 @@ def get_action_id(direction, status):
     else:
         return 16  # 默认支出
 
-def import_bills(json_file, processed_transactions_file=None):
-    """导入账单"""
+def import_bills(json_file, last_transaction_file=None):
+    """
+    导入账单
+    
+    Args:
+        json_file: 解析后的 JSON 文件路径
+        last_transaction_file: 存储各平台最新交易单号的文件路径（JSON格式）
+    """
     print(f"\n=== 导入账单: {json_file} ===")
     
     with open(json_file, 'r', encoding='utf-8') as f:
         bills = json.load(f)
     
     print(f"共 {len(bills)} 条记录")
-    
-    # 加载已导入的交易单号
-    processed_transactions = set()
-    if processed_transactions_file and processed_transactions_file.exists():
-        with open(processed_transactions_file, 'r') as f:
-            processed_transactions = set(f.read().splitlines())
-        print(f"已加载 {len(processed_transactions)} 条历史交易记录")
-    
-    # 过滤重复交易
-    new_bills = []
-    skipped_count = 0
-    for bill in bills:
-        # 微信用交易单号，支付宝用交易订单号
-        transaction_id = bill.get('交易单号', '') or bill.get('transaction_id', '')
-        if transaction_id and transaction_id in processed_transactions:
-            skipped_count += 1
-        else:
-            new_bills.append(bill)
-    
-    if skipped_count > 0:
-        print(f"✓ 跳过 {skipped_count} 条重复交易")
-    
-    bills = new_bills
-    if not bills:
-        print("没有新交易需要导入")
-        return
     
     # 根据文件名判断平台
     filename = json_file.name.lower()
@@ -338,6 +318,51 @@ def import_bills(json_file, processed_transactions_file=None):
             platform = 'wechat'
     
     print(f"检测到平台: {platform}")
+    
+    # 加载上次最新交易单号
+    last_transactions = {}
+    if last_transaction_file and last_transaction_file.exists():
+        with open(last_transaction_file, 'r', encoding='utf-8') as f:
+            last_transactions = json.load(f)
+        print(f"已加载历史最新单号记录")
+    
+    # 获取上次该平台的最新单号
+    last_seen_id = last_transactions.get(platform, '')
+    last_seen_time = last_transactions.get(f'{platform}_time', '')
+    
+    if last_seen_id:
+        print(f"上次最新单号: {last_seen_id} (时间: {last_seen_time})")
+        
+        # 找到匹配位置
+        match_idx = -1
+        for i, bill in enumerate(bills):
+            transaction_id = bill.get('交易单号', '') or bill.get('transaction_id', '')
+            if transaction_id == last_seen_id:
+                match_idx = i
+                break
+        
+        if match_idx >= 0:
+            # 严谨方案：继续往后跳过同秒的交易
+            skip_idx = match_idx
+            while skip_idx + 1 < len(bills) and bills[skip_idx + 1].get('交易时间', '') == last_seen_time:
+                skip_idx += 1
+            
+            # 只取匹配位置之前的记录（因为是倒序，前面的是新的）
+            new_bills = bills[:skip_idx + 1]
+            skipped_count = len(bills) - len(new_bills)
+            
+            if skipped_count > 0:
+                print(f"✓ 跳过 {skipped_count} 条已导入的交易")
+            
+            bills = new_bills
+        else:
+            print(f"✓ 未找到匹配单号，全部 {len(bills)} 条都是新交易")
+    else:
+        print(f"✓ 首次导入，全部 {len(bills)} 条都是新交易")
+    
+    if not bills:
+        print("没有新交易需要导入")
+        return
     
     # 时间标准化：提取年月
     for bill in bills:
@@ -455,18 +480,28 @@ def import_bills(json_file, processed_transactions_file=None):
     print(f"✓ 成功: {success_count}")
     print(f"✗ 失败: {error_count}")
     
-    # 保存已处理的交易单号
-    if processed_transactions_file and success_count > 0:
-        new_transaction_ids = set()
-        for bill in bills:
-            transaction_id = bill.get('交易单号', '') or bill.get('transaction_id', '')
-            if transaction_id:
-                new_transaction_ids.add(transaction_id)
+    # 保存最新交易单号和时间
+    if last_transaction_file and success_count > 0 and bills:
+        # 取第一条（最新的一条）
+        latest_bill = bills[0]
+        latest_id = latest_bill.get('交易单号', '') or latest_bill.get('transaction_id', '')
+        latest_time = latest_bill.get('交易时间', '')
         
-        with open(processed_transactions_file, 'a') as f:
-            for tid in new_transaction_ids:
-                f.write(f"{tid}\n")
-        print(f"✓ 已保存 {len(new_transaction_ids)} 条交易单号到 {processed_transactions_file}")
+        # 加载现有记录
+        last_transactions = {}
+        if last_transaction_file.exists():
+            with open(last_transaction_file, 'r', encoding='utf-8') as f:
+                last_transactions = json.load(f)
+        
+        # 更新该平台最新单号
+        last_transactions[platform] = latest_id
+        last_transactions[f'{platform}_time'] = latest_time
+        
+        # 保存
+        with open(last_transaction_file, 'w', encoding='utf-8') as f:
+            json.dump(last_transactions, f, ensure_ascii=False, indent=2)
+        
+        print(f"✓ 已更新最新单号: {latest_id} (时间: {latest_time})")
     
     # 修复 account_to_id 为 NULL 的问题（Java实体类中是int基本类型，不能接受NULL）
     print("\n=== 修复 account_to_id NULL 值 ===")

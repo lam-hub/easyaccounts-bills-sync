@@ -6,6 +6,7 @@
 
 import os
 import sys
+import json
 import argparse
 import yaml
 import zipfile
@@ -50,8 +51,8 @@ def extract_zip(zip_path, password):
         return None
 
 
-def process_new_bills(config, wechat_password=None, alipay_password=None):
-    """处理新账单"""
+def process_new_bills(config, password=None):
+    """处理新账单，返回 (成功数, 失败数)"""
     data_dir = Path(config['storage']['data_dir'])
     data_dir.mkdir(exist_ok=True)
     
@@ -69,27 +70,28 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
     
     if not new_bills:
         print("\n没有新的账单需要处理")
-        return
+        return (0, 0)
     
     print(f"\n✓ 下载了 {len(new_bills)} 个新账单\n")
+    
+    # 获取解压密码（单次只处理一封，只需要一个密码）
+    if password is None:
+        password = input("请输入账单解压密码: ").strip()
+    else:
+        print("使用命令行提供的密码")
     
     # 按平台分组
     wechat_bills = [b for b in new_bills if b['platform'] == 'wechat']
     alipay_bills = [b for b in new_bills if b['platform'] == 'alipay']
     
     all_records = []
+    failed_count = 0
     
     # 2. 处理微信账单
     if wechat_bills:
         print("=" * 60)
         print(f"处理微信账单 ({len(wechat_bills)} 个)")
         print("=" * 60)
-        
-        if wechat_password is None:
-            password = input("请输入微信账单解压密码: ").strip()
-        else:
-            password = wechat_password
-            print(f"使用命令行提供的微信密码")
         
         wechat_account_id = config['accounts']['wechat']
         
@@ -99,6 +101,7 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
             
             xlsx_path = extract_zip(zip_path, password)
             if not xlsx_path:
+                failed_count += 1
                 continue
             
             print(f"✓ 解压成功: {xlsx_path.name}")
@@ -119,7 +122,6 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
                 
                 # 保存解析结果
                 output_file = data_dir / f"{zip_path.stem}_parsed.json"
-                import json
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(records, f, ensure_ascii=False, indent=2)
                 print(f"✓ 已保存: {output_file}")
@@ -134,12 +136,6 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
         print(f"处理支付宝账单 ({len(alipay_bills)} 个)")
         print("=" * 60)
         
-        if alipay_password is None:
-            password = input("请输入支付宝账单解压密码: ").strip()
-        else:
-            password = alipay_password
-            print(f"使用命令行提供的支付宝密码")
-        
         alipay_account_id = config['accounts']['alipay']
         
         for bill in alipay_bills:
@@ -150,6 +146,7 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
             if zip_path.suffix.lower() == '.zip':
                 csv_path = extract_zip(zip_path, password)
                 if not csv_path:
+                    failed_count += 1
                     continue
             else:
                 csv_path = zip_path
@@ -172,7 +169,6 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
                 
                 # 保存解析结果
                 output_file = data_dir / f"{zip_path.stem}_parsed.json"
-                import json
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(records, f, ensure_ascii=False, indent=2)
                 print(f"✓ 已保存: {output_file}")
@@ -181,10 +177,17 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
                 print(f"✗ 解析失败: {e}")
                 continue
     
-    # 4. 导入EasyAccounts
+    # 4. 检查处理结果
+    if failed_count > 0 and not all_records:
+        print("\n" + "=" * 60)
+        print(f"✗ 所有账单处理失败 ({failed_count} 个)")
+        print("=" * 60)
+        return (0, failed_count)
+    
+    # 5. 导入EasyAccounts
     if all_records:
         print("\n" + "=" * 60)
-        print("步骤4: 导入EasyAccounts")
+        print("步骤5: 导入EasyAccounts")
         print("=" * 60)
         print(f"共 {len(all_records)} 条记录待导入")
         
@@ -197,7 +200,7 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
             if wechat_json_files:
                 latest_wechat = max(wechat_json_files, key=lambda p: p.stat().st_mtime)
                 print(f"\n导入微信账单: {latest_wechat.name}")
-                import_bills(latest_wechat, Path(config['storage']['processed_transactions_file']))
+                import_bills(latest_wechat, Path(config['storage']['last_transaction_file']))
         
         # 导入支付宝账单
         if alipay_bills:
@@ -205,15 +208,19 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
             if alipay_json_files:
                 latest_alipay = max(alipay_json_files, key=lambda p: p.stat().st_mtime)
                 print(f"\n导入支付宝账单: {latest_alipay.name}")
-                import_bills(latest_alipay, Path(config['storage']['processed_transactions_file']))
+                import_bills(latest_alipay, Path(config['storage']['last_transaction_file']))
         
         print("\n✓ 导入完成")
         
-        # 5. 清理中间文件
+        # 6. 清理中间文件
         print("\n" + "=" * 60)
-        print("步骤5: 清理中间文件")
+        print("步骤6: 清理中间文件")
         print("=" * 60)
         cleanup_files(data_dir, wechat_bills + alipay_bills)
+    
+    # 返回处理结果
+    success_count = len(all_records)
+    return (success_count, failed_count)
 
 
 def cleanup_files(data_dir, bills):
@@ -277,8 +284,7 @@ def reimport_all(config):
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='微信/支付宝账单自动同步工具')
-    parser.add_argument('--wechat-password', help='微信账单解压密码')
-    parser.add_argument('--alipay-password', help='支付宝账单解压密码')
+    parser.add_argument('--password', help='账单解压密码')
     parser.add_argument('--reimport', action='store_true', help='重新导入所有JSON账单')
     
     args = parser.parse_args()
@@ -294,13 +300,14 @@ def main():
     try:
         if args.reimport:
             reimport_all(config)
+            print("\n✓ 同步完成")
         else:
-            process_new_bills(
-                config,
-                wechat_password=args.wechat_password,
-                alipay_password=args.alipay_password
-            )
-        print("\n✓ 同步完成")
+            success_count, failed_count = process_new_bills(config, password=args.password)
+            if failed_count > 0 and success_count == 0:
+                print("\n✗ 同步失败")
+                sys.exit(1)
+            else:
+                print("\n✓ 同步完成")
     except KeyboardInterrupt:
         print("\n\n用户中断")
         sys.exit(0)
