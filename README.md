@@ -7,7 +7,6 @@
 - **邮件监听**：自动检测并下载微信/支付宝账单邮件附件
 - **账单解析**：支持微信 XLSX 和支付宝 CSV 格式
 - **数据导入**：调用 EasyAccounts API 写入本地记账系统
-- **辅助工具**：数据修复、退款标记
 
 ## 工作流程
 
@@ -28,15 +27,14 @@
 ├── email_listener.py          # 邮件监听模块
 ├── csv_parser.py              # 账单解析模块
 ├── easyaccounts_import.py     # EasyAccounts API 集成
-├── easyaccounts_fix.py        # 数据修复工具
-├── easyaccounts_mark_refund.py # 退款标记工具
-├── config.yaml                # 配置文件
+├── config.yaml                # 配置文件（需自行创建）
+├── config.yaml.example        # 配置文件示例
 └── data/                      # 下载的账单文件（自动生成）
 ```
 
 ## 配置说明
 
-编辑 `config.yaml`：
+复制 `config.yaml.example` 为 `config.yaml` 并编辑：
 
 ```yaml
 email:
@@ -58,8 +56,6 @@ alipay:
 
 ## 使用方法
 
-### 手动执行
-
 ```bash
 # 同步所有账单
 python main.py
@@ -72,16 +68,6 @@ python main.py --platform alipay
 
 # 指定账单文件
 python main.py --file /path/to/bill.zip
-```
-
-### 辅助工具
-
-```bash
-# 修复数据（重新导入失败的记录）
-python easyaccounts_fix.py
-
-# 标记退款记录
-python easyaccounts_mark_refund.py
 ```
 
 ## 依赖
