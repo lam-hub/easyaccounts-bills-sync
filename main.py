@@ -208,6 +208,42 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
                 import_bills(latest_alipay)
         
         print("\n✓ 导入完成")
+        
+        # 5. 清理中间文件
+        print("\n" + "=" * 60)
+        print("步骤5: 清理中间文件")
+        print("=" * 60)
+        cleanup_files(data_dir, wechat_bills + alipay_bills)
+
+
+def cleanup_files(data_dir, bills):
+    """清理中间文件（zip、解压目录、json）"""
+    deleted_count = 0
+    
+    for bill in bills:
+        zip_path = Path(bill['filepath'])
+        
+        # 删除 zip 文件
+        if zip_path.exists():
+            zip_path.unlink()
+            print(f"✓ 删除: {zip_path.name}")
+            deleted_count += 1
+        
+        # 删除解压目录
+        extract_dir = zip_path.parent / zip_path.stem
+        if extract_dir.exists() and extract_dir.is_dir():
+            shutil.rmtree(extract_dir)
+            print(f"✓ 删除目录: {extract_dir.name}")
+            deleted_count += 1
+        
+        # 删除解析后的 json 文件
+        json_path = data_dir / f"{zip_path.stem}_parsed.json"
+        if json_path.exists():
+            json_path.unlink()
+            print(f"✓ 删除: {json_path.name}")
+            deleted_count += 1
+    
+    print(f"\n✓ 共清理 {deleted_count} 个中间文件")
 
 
 def reimport_all(config):

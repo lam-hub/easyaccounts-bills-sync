@@ -57,18 +57,23 @@ alipay:
 ## 使用方法
 
 ```bash
-# 同步所有账单
+# 同步所有账单（会提示输入密码）
 python main.py
 
+# 通过命令行参数指定密码
+python main.py --wechat-password 微信密码 --alipay-password 支付宝密码
+
 # 仅处理微信账单
-python main.py --platform wechat
+python main.py --platform wechat --wechat-password 微信密码
 
 # 仅处理支付宝账单
-python main.py --platform alipay
+python main.py --platform alipay --alipay-password 支付宝密码
 
 # 指定账单文件
 python main.py --file /path/to/bill.zip
 ```
+
+导入成功后会自动清理中间文件（zip、解压目录、json）。
 
 ## 依赖
 
