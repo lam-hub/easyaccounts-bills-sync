@@ -197,7 +197,7 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
             if wechat_json_files:
                 latest_wechat = max(wechat_json_files, key=lambda p: p.stat().st_mtime)
                 print(f"\n导入微信账单: {latest_wechat.name}")
-                import_bills(latest_wechat)
+                import_bills(latest_wechat, Path(config['storage']['processed_transactions_file']))
         
         # 导入支付宝账单
         if alipay_bills:
@@ -205,7 +205,7 @@ def process_new_bills(config, wechat_password=None, alipay_password=None):
             if alipay_json_files:
                 latest_alipay = max(alipay_json_files, key=lambda p: p.stat().st_mtime)
                 print(f"\n导入支付宝账单: {latest_alipay.name}")
-                import_bills(latest_alipay)
+                import_bills(latest_alipay, Path(config['storage']['processed_transactions_file']))
         
         print("\n✓ 导入完成")
         

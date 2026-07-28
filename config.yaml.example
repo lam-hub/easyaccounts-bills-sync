@@ -18,6 +18,7 @@ filters:
 storage:
   data_dir: "./data"
   processed_uid_file: "./data/processed_uids.txt"
+  processed_transactions_file: "./data/processed_transactions.txt"
 
 # EasyAccounts 账户分类映射
 accounts:

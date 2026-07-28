@@ -289,7 +289,7 @@ def get_action_id(direction, status):
     else:
         return 16  # 默认支出
 
-def import_bills(json_file):
+def import_bills(json_file, processed_transactions_file=None):
     """导入账单"""
     print(f"\n=== 导入账单: {json_file} ===")
     
@@ -297,6 +297,32 @@ def import_bills(json_file):
         bills = json.load(f)
     
     print(f"共 {len(bills)} 条记录")
+    
+    # 加载已导入的交易单号
+    processed_transactions = set()
+    if processed_transactions_file and processed_transactions_file.exists():
+        with open(processed_transactions_file, 'r') as f:
+            processed_transactions = set(f.read().splitlines())
+        print(f"已加载 {len(processed_transactions)} 条历史交易记录")
+    
+    # 过滤重复交易
+    new_bills = []
+    skipped_count = 0
+    for bill in bills:
+        # 微信用交易单号，支付宝用交易订单号
+        transaction_id = bill.get('交易单号', '') or bill.get('transaction_id', '')
+        if transaction_id and transaction_id in processed_transactions:
+            skipped_count += 1
+        else:
+            new_bills.append(bill)
+    
+    if skipped_count > 0:
+        print(f"✓ 跳过 {skipped_count} 条重复交易")
+    
+    bills = new_bills
+    if not bills:
+        print("没有新交易需要导入")
+        return
     
     # 根据文件名判断平台
     filename = json_file.name.lower()
@@ -428,6 +454,19 @@ def import_bills(json_file):
     print(f"\n=== 导入完成 ===")
     print(f"✓ 成功: {success_count}")
     print(f"✗ 失败: {error_count}")
+    
+    # 保存已处理的交易单号
+    if processed_transactions_file and success_count > 0:
+        new_transaction_ids = set()
+        for bill in bills:
+            transaction_id = bill.get('交易单号', '') or bill.get('transaction_id', '')
+            if transaction_id:
+                new_transaction_ids.add(transaction_id)
+        
+        with open(processed_transactions_file, 'a') as f:
+            for tid in new_transaction_ids:
+                f.write(f"{tid}\n")
+        print(f"✓ 已保存 {len(new_transaction_ids)} 条交易单号到 {processed_transactions_file}")
     
     # 修复 account_to_id 为 NULL 的问题（Java实体类中是int基本类型，不能接受NULL）
     print("\n=== 修复 account_to_id NULL 值 ===")
