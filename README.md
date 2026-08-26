@@ -58,21 +58,20 @@ alipay:
 ## 使用方法
 
 ```bash
-# 同步所有账单（会提示输入密码）
+# 同步所有账单（交互式输入密码）
 python main.py
 
 # 通过命令行参数指定密码
-python main.py --wechat-password 微信密码 --alipay-password 支付宝密码
+python main.py --password 账单密码
 
-# 仅处理微信账单
-python main.py --platform wechat --wechat-password 微信密码
-
-# 仅处理支付宝账单
-python main.py --platform alipay --alipay-password 支付宝密码
-
-# 指定账单文件
-python main.py --file /path/to/bill.zip
+# 重新导入所有已解析的JSON账单（不下载新邮件）
+python main.py --reimport --password 账单密码
 ```
+
+**说明：**
+- 程序会自动监听邮箱，下载微信和支付宝账单邮件
+- 密码用于解压下载的 ZIP 文件（微信/支付宝账单共用）
+- 自动去重：已导入的交易不会重复记录
 
 导入成功后会自动清理中间文件（zip、解压目录、json）。
 
