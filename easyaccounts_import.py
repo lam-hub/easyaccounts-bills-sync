@@ -305,7 +305,8 @@ def import_bills(json_file, last_transaction_file=None):
     print(f"共 {len(bills)} 条记录")
     
     # 根据文件名判断平台
-    filename = json_file.name.lower()
+    import os
+    filename = os.path.basename(json_file).lower()
     if filename.startswith('alipay'):
         platform = 'alipay'
     elif filename.startswith('wechat'):
